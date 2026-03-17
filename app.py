@@ -17,16 +17,18 @@ OUTPUT_ROOT = Path("outputs")
 DEFAULT_PREFERRED_PORT = 8907
 APP_CSS = """
 :root {
-  --bg-0: #06111f;
-  --bg-1: #0b1830;
-  --panel: rgba(11, 24, 48, 0.78);
-  --panel-2: rgba(14, 28, 54, 0.9);
-  --line: rgba(115, 161, 255, 0.18);
-  --text: #e7eefc;
-  --muted: #9aabc9;
+  --bg-0: #08111d;
+  --bg-1: #0e1b2d;
+  --panel: #12233a;
+  --panel-2: #172b45;
+  --line: rgba(125, 174, 255, 0.22);
+  --text: #eef4ff;
+  --muted: #b8c6de;
   --accent: #53d1ff;
   --accent-2: #7b7cff;
   --accent-3: #ff8f5c;
+  --surface: #f7faff;
+  --surface-text: #10233b;
 }
 
 body, .gradio-container {
@@ -45,12 +47,12 @@ body, .gradio-container {
 .hero-panel {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(7, 18, 35, 0.94), rgba(13, 29, 56, 0.96));
+  background: linear-gradient(135deg, #0d2038, #142844);
   color: var(--text);
   padding: 28px 30px;
   border-radius: 28px;
-  border: 1px solid rgba(110, 173, 255, 0.18);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(110, 173, 255, 0.2);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
   margin-bottom: 18px;
 }
 
@@ -68,6 +70,7 @@ body, .gradio-container {
   font-weight: 700;
   letter-spacing: -0.03em;
   margin-bottom: 10px;
+  color: #f4f8ff;
 }
 
 .hero-build {
@@ -85,7 +88,7 @@ body, .gradio-container {
 .hero-subtitle {
   max-width: 1040px;
   line-height: 1.7;
-  color: #b8c7e4;
+  color: #d5dff2;
   margin-bottom: 18px;
 }
 
@@ -96,11 +99,10 @@ body, .gradio-container {
 }
 
 .hero-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(115, 161, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(115, 161, 255, 0.18);
   border-radius: 18px;
   padding: 14px 16px;
-  backdrop-filter: blur(10px);
 }
 
 .hero-card strong {
@@ -115,16 +117,17 @@ body, .gradio-container {
 .hero-card span {
   font-size: 1rem;
   line-height: 1.5;
+  color: #e8efff;
 }
 
 .section-note {
-  background: rgba(12, 24, 46, 0.7);
-  border: 1px solid rgba(115, 161, 255, 0.14);
+  background: #13253d;
+  border: 1px solid rgba(115, 161, 255, 0.18);
   border-radius: 20px;
   padding: 16px 18px;
   margin-bottom: 16px;
-  color: #bdd0f3;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+  color: #dde8fb;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
 }
 
 .panel-shell, .results-shell {
@@ -132,17 +135,16 @@ body, .gradio-container {
   border: 1px solid var(--line);
   border-radius: 24px;
   padding: 14px;
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(14px);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.18);
 }
 
 .studio-note {
-  background: linear-gradient(135deg, rgba(83, 209, 255, 0.08), rgba(123, 124, 255, 0.08));
-  border: 1px solid rgba(83, 209, 255, 0.16);
+  background: #112840;
+  border: 1px solid rgba(83, 209, 255, 0.18);
   border-radius: 18px;
   padding: 14px 16px;
   margin-bottom: 12px;
-  color: #d7e4ff;
+  color: #e5efff;
 }
 
 button.primary {
@@ -158,6 +160,16 @@ button.primary {
   border-color: rgba(115, 161, 255, 0.14) !important;
 }
 
+.gradio-container h1,
+.gradio-container h2,
+.gradio-container h3,
+.gradio-container h4,
+.gradio-container p,
+.gradio-container span,
+.gradio-container strong {
+  color: var(--text);
+}
+
 .gradio-container label,
 .gradio-container .prose,
 .gradio-container .md,
@@ -166,14 +178,80 @@ button.primary {
   color: var(--text) !important;
 }
 
+.gradio-container .tab-nav button.selected {
+  color: #ffffff !important;
+  border-bottom-color: var(--accent) !important;
+}
+
 .gradio-container input,
 .gradio-container textarea,
+.gradio-container select {
+  background: var(--surface) !important;
+  color: var(--surface-text) !important;
+  border: 1px solid #c7d5ea !important;
+}
+
 .gradio-container .wrap,
 .gradio-container .dropdown,
 .gradio-container .input-container,
-.gradio-container .scroll-hide {
-  background: rgba(8, 18, 34, 0.82) !important;
+.gradio-container .scroll-hide,
+.gradio-container .block.gradio-textbox,
+.gradio-container .block.gradio-dropdown,
+.gradio-container .block.gradio-radio,
+.gradio-container .block.gradio-slider,
+.gradio-container .block.gradio-image,
+.gradio-container .block.gradio-file,
+.gradio-container .block.gradio-plot {
+  background: #18304f !important;
   color: var(--text) !important;
+}
+
+.gradio-container .form,
+.gradio-container .block {
+  color: var(--text) !important;
+}
+
+.gradio-container .tabitem {
+  background: transparent !important;
+}
+
+.gradio-container .tab-nav {
+  border-bottom: 1px solid rgba(125, 174, 255, 0.2) !important;
+}
+
+.gradio-container .tab-nav button {
+  opacity: 0.92;
+}
+
+.gradio-container .tab-nav button:not(.selected) {
+  color: #b7c7e4 !important;
+}
+
+.gradio-container [data-testid="textbox"],
+.gradio-container [data-testid="dropdown"],
+.gradio-container [data-testid="radio"],
+.gradio-container [data-testid="slider"] {
+  color: var(--text) !important;
+}
+
+.gradio-container .block.gradio-textbox input,
+.gradio-container .block.gradio-dropdown input,
+.gradio-container .block.gradio-dropdown button,
+.gradio-container .block.gradio-dropdown span {
+  color: var(--surface-text) !important;
+}
+
+.gradio-container .gradio-radio label,
+.gradio-container .gradio-dropdown label,
+.gradio-container .gradio-slider label,
+.gradio-container .gradio-image label,
+.gradio-container .gradio-file label {
+  color: #eef4ff !important;
+}
+
+.gradio-container .block.gradio-dropdown .wrap,
+.gradio-container .block.gradio-textbox .wrap {
+  background: transparent !important;
 }
 
 @media (max-width: 1100px) {
