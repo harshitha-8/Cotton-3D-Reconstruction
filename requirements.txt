@@ -1,0 +1,9 @@
+gradio>=5.22.0
+numpy>=1.26.4
+pillow>=10.4.0
+plotly>=6.0.0
+trimesh>=4.6.0
+torch>=2.4.0
+transformers>=4.45.0
+accelerate>=1.1.0
+safetensors>=0.4.5
