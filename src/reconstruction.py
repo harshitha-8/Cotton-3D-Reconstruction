@@ -27,6 +27,7 @@ class ReconstructionResult:
     cotton_overlay: Image.Image
     cotton_figure: go.Figure
     object_preview: Image.Image
+    object_figure: go.Figure
     object_model_file: str
     point_cloud_file: str
     mesh_file: str
@@ -53,6 +54,7 @@ def reconstruct_image_to_assets(
     cotton_mask = detect_cotton_mask(rgb, depth)
     cotton_overlay = create_cotton_overlay(image, cotton_mask)
     cotton_figure, cotton_metrics = create_cotton_focus_figure(rgb, depth, cotton_mask, config.z_scale)
+    object_figure = create_object_studio_figure(rgb, depth, cotton_mask, config.z_scale)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = output_root / f"{image_path.stem}_{timestamp}"
@@ -84,6 +86,7 @@ def reconstruct_image_to_assets(
         cotton_overlay=cotton_overlay,
         cotton_figure=cotton_figure,
         object_preview=object_preview,
+        object_figure=object_figure,
         object_model_file=str(object_mesh_path),
         point_cloud_file=str(point_cloud_path),
         mesh_file=str(mesh_path),
@@ -327,6 +330,105 @@ def create_cotton_focus_figure(
         ]
     )
     return figure, metrics
+
+
+def create_object_studio_figure(
+    rgb: np.ndarray,
+    depth: np.ndarray,
+    cotton_mask: np.ndarray,
+    z_scale: float,
+) -> go.Figure:
+    figure = go.Figure()
+    if not np.any(cotton_mask):
+        figure.update_layout(
+            title="Cotton object studio unavailable",
+            annotations=[
+                dict(
+                    text="No isolated cotton object was extracted from this frame.",
+                    x=0.5,
+                    y=0.5,
+                    xref="paper",
+                    yref="paper",
+                    showarrow=False,
+                    font=dict(color="#e8eefc", size=16),
+                )
+            ],
+            height=640,
+            paper_bgcolor="#08111f",
+            plot_bgcolor="#08111f",
+        )
+        return figure
+
+    rows, cols = np.where(cotton_mask)
+    row_min, row_max = max(0, rows.min() - 8), min(depth.shape[0], rows.max() + 9)
+    col_min, col_max = max(0, cols.min() - 8), min(depth.shape[1], cols.max() + 9)
+
+    crop_depth = depth[row_min:row_max, col_min:col_max]
+    crop_rgb = rgb[row_min:row_max, col_min:col_max]
+    crop_mask = cotton_mask[row_min:row_max, col_min:col_max]
+
+    h, w = crop_depth.shape
+    yy, xx = np.mgrid[0:h, 0:w]
+    x = xx.astype(np.float32) - w / 2.0
+    y = (h - yy).astype(np.float32) - h / 2.0
+    z = crop_depth.astype(np.float32) * z_scale
+    surface_z = np.where(crop_mask, z, np.nan)
+
+    figure.add_trace(
+        go.Surface(
+            x=x,
+            y=y,
+            z=surface_z,
+            surfacecolor=np.where(crop_mask, crop_depth, np.nan),
+            colorscale=[
+                [0.0, "#6b4f3f"],
+                [0.25, "#98715b"],
+                [0.6, "#c8aa8f"],
+                [0.86, "#f2eadf"],
+                [1.0, "#ffffff"],
+            ],
+            showscale=False,
+            opacity=0.98,
+            lighting=dict(ambient=0.7, diffuse=0.95, specular=0.25, roughness=0.85),
+            lightposition=dict(x=80, y=120, z=240),
+        )
+    )
+
+    bright_mask = crop_mask & (crop_rgb.mean(axis=2) >= np.quantile(crop_rgb.mean(axis=2)[crop_mask], 0.84))
+    if np.any(bright_mask):
+        b_rows, b_cols = np.where(bright_mask)
+        figure.add_trace(
+            go.Scatter3d(
+                x=b_cols.astype(np.float32) - w / 2.0,
+                y=(h - b_rows).astype(np.float32) - h / 2.0,
+                z=crop_depth[b_rows, b_cols].astype(np.float32) * z_scale + 1.2,
+                mode="markers",
+                marker={"size": 4.8, "color": "#fff8f0", "opacity": 0.95},
+                name="Cotton bolls",
+            )
+        )
+
+    figure.update_layout(
+        title="Isolated cotton object studio",
+        height=640,
+        margin=dict(l=0, r=0, t=52, b=0),
+        paper_bgcolor="#08111f",
+        plot_bgcolor="#08111f",
+        scene=dict(
+            bgcolor="#08111f",
+            aspectmode="data",
+            camera=dict(eye=dict(x=1.55, y=1.25, z=0.9)),
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            zaxis=dict(visible=False),
+        ),
+        legend=dict(
+            bgcolor="rgba(8, 17, 31, 0.65)",
+            font=dict(color="#dfe9ff"),
+        ),
+        font=dict(color="#dfe9ff"),
+    )
+    return figure
 
 
 def save_point_cloud(path: Path, points: np.ndarray, colors: np.ndarray) -> None:

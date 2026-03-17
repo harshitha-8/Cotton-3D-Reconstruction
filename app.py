@@ -3,51 +3,89 @@ from __future__ import annotations
 import html
 import os
 import socket
+import subprocess
 from pathlib import Path
 from typing import Optional
 
 import gradio as gr
 
 from src.data import DATASET_ROOT, list_dataset_images, resolve_dataset_image
-from src.insights import generate_research_note
 from src.reconstruction import ReconstructionConfig, reconstruct_image_to_assets
 
 
 OUTPUT_ROOT = Path("outputs")
 DEFAULT_PREFERRED_PORT = 8907
 APP_CSS = """
+:root {
+  --bg-0: #06111f;
+  --bg-1: #0b1830;
+  --panel: rgba(11, 24, 48, 0.78);
+  --panel-2: rgba(14, 28, 54, 0.9);
+  --line: rgba(115, 161, 255, 0.18);
+  --text: #e7eefc;
+  --muted: #9aabc9;
+  --accent: #53d1ff;
+  --accent-2: #7b7cff;
+  --accent-3: #ff8f5c;
+}
+
 body, .gradio-container {
   background:
-    radial-gradient(circle at top left, rgba(58, 92, 74, 0.12), transparent 28%),
-    linear-gradient(180deg, #f5f1e8 0%, #ece7dc 100%);
-  color: #1d2822;
+    radial-gradient(circle at top left, rgba(83, 209, 255, 0.12), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(123, 124, 255, 0.16), transparent 24%),
+    linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
+  color: var(--text);
   font-family: "Avenir Next", "Segoe UI", sans-serif;
 }
 
 .gradio-container {
-  max-width: 1580px !important;
+  max-width: 1620px !important;
 }
 
 .hero-panel {
-  background: linear-gradient(135deg, rgba(34, 73, 59, 0.96), rgba(59, 93, 74, 0.92));
-  color: #f7f4ed;
-  padding: 24px 28px;
-  border-radius: 22px;
-  box-shadow: 0 24px 60px rgba(20, 35, 28, 0.18);
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(7, 18, 35, 0.94), rgba(13, 29, 56, 0.96));
+  color: var(--text);
+  padding: 28px 30px;
+  border-radius: 28px;
+  border: 1px solid rgba(110, 173, 255, 0.18);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
   margin-bottom: 18px;
 }
 
+.hero-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(83, 209, 255, 0.06) 48%, transparent 100%);
+  pointer-events: none;
+}
+
 .hero-title {
-  font-size: 2.2rem;
+  font-size: 2.3rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   margin-bottom: 10px;
 }
 
+.hero-build {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(83, 209, 255, 0.08);
+  border: 1px solid rgba(83, 209, 255, 0.22);
+  color: #aee8ff;
+  font-size: 0.82rem;
+  vertical-align: middle;
+}
+
 .hero-subtitle {
-  max-width: 980px;
-  line-height: 1.65;
-  color: rgba(247, 244, 237, 0.9);
+  max-width: 1040px;
+  line-height: 1.7;
+  color: #b8c7e4;
   margin-bottom: 18px;
 }
 
@@ -58,54 +96,84 @@ body, .gradio-container {
 }
 
 .hero-card {
-  background: rgba(247, 244, 237, 0.11);
-  border: 1px solid rgba(247, 244, 237, 0.18);
-  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(115, 161, 255, 0.14);
+  border-radius: 18px;
   padding: 14px 16px;
+  backdrop-filter: blur(10px);
 }
 
 .hero-card strong {
   display: block;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(247, 244, 237, 0.72);
+  color: #82b0ff;
   margin-bottom: 6px;
 }
 
 .hero-card span {
   font-size: 1rem;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .section-note {
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(48, 71, 60, 0.14);
-  border-radius: 18px;
+  background: rgba(12, 24, 46, 0.7);
+  border: 1px solid rgba(115, 161, 255, 0.14);
+  border-radius: 20px;
   padding: 16px 18px;
-  margin-bottom: 14px;
-  box-shadow: 0 12px 28px rgba(40, 51, 44, 0.08);
+  margin-bottom: 16px;
+  color: #bdd0f3;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
 }
 
-.panel-shell {
-  background: rgba(255, 255, 255, 0.76);
-  border: 1px solid rgba(48, 71, 60, 0.12);
-  border-radius: 22px;
-  padding: 10px;
-  box-shadow: 0 12px 32px rgba(34, 50, 42, 0.08);
+.panel-shell, .results-shell {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 14px;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(14px);
 }
 
-.results-shell {
-  background: rgba(250, 248, 242, 0.88);
-  border-radius: 22px;
-  border: 1px solid rgba(48, 71, 60, 0.12);
-  padding: 10px;
-  box-shadow: 0 12px 32px rgba(34, 50, 42, 0.08);
+.studio-note {
+  background: linear-gradient(135deg, rgba(83, 209, 255, 0.08), rgba(123, 124, 255, 0.08));
+  border: 1px solid rgba(83, 209, 255, 0.16);
+  border-radius: 18px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  color: #d7e4ff;
 }
 
 button.primary {
-  background: linear-gradient(135deg, #2e5a45, #4f7b61) !important;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+  color: #06111f !important;
   border: none !important;
+  box-shadow: 0 10px 24px rgba(83, 209, 255, 0.28);
+}
+
+.gradio-container .block,
+.gradio-container .form,
+.gradio-container .tabitem {
+  border-color: rgba(115, 161, 255, 0.14) !important;
+}
+
+.gradio-container label,
+.gradio-container .prose,
+.gradio-container .md,
+.gradio-container .tabs,
+.gradio-container .tab-nav button {
+  color: var(--text) !important;
+}
+
+.gradio-container input,
+.gradio-container textarea,
+.gradio-container .wrap,
+.gradio-container .dropdown,
+.gradio-container .input-container,
+.gradio-container .scroll-hide {
+  background: rgba(8, 18, 34, 0.82) !important;
+  color: var(--text) !important;
 }
 
 @media (max-width: 1100px) {
@@ -151,6 +219,17 @@ def build_dataset_choices(phase: str) -> list[str]:
     return [item.display_name for item in images]
 
 
+def get_build_label() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=Path(__file__).resolve().parent,
+            text=True,
+        ).strip()
+    except Exception:
+        return "local"
+
+
 def update_image_choices(phase: str) -> tuple[gr.Dropdown, str]:
     choices = build_dataset_choices(phase)
     value = choices[0] if choices else None
@@ -170,10 +249,8 @@ def run_reconstruction(
 
     if uploaded_image is not None:
         image_path = Path(uploaded_image)
-        source_label = f"Uploaded image: {image_path.name}"
     else:
         image_path = resolve_dataset_image(phase, dataset_image_name)
-        source_label = f"Dataset image: {dataset_image_name}"
 
     config = ReconstructionConfig(
         max_points=max_points,
@@ -184,15 +261,6 @@ def run_reconstruction(
         output_root=OUTPUT_ROOT,
         config=config,
     )
-    summary = "\n".join(
-        [
-            source_label,
-            f"Depth strategy: {result.depth_strategy_used}",
-            f"Point count: {result.num_points}",
-            f"Output folder: {result.output_dir}",
-        ]
-    )
-    display_summary = f"{summary}\n{result.cotton_metrics}"
     return (
         result.preview_image,
         result.depth_preview,
@@ -200,14 +268,10 @@ def run_reconstruction(
         result.cotton_overlay,
         result.cotton_figure,
         result.object_preview,
-        result.object_model_file,
+        result.object_figure,
         result.point_cloud_file,
         result.mesh_file,
         result.depth_npy_file,
-        display_summary,
-        summary,
-        result.cotton_metrics,
-        "",
     )
 
 
@@ -215,21 +279,22 @@ def create_app() -> gr.Blocks:
     initial_phase = "pre-deflation"
     initial_choices = build_dataset_choices(initial_phase)
     initial_value = initial_choices[0] if initial_choices else None
+    build_label = get_build_label()
 
     with gr.Blocks(title="Cotton 3D Reconstruction", css=APP_CSS) as demo:
         gr.HTML(
             f"""
             <div class="hero-panel">
-              <div class="hero-title">Cotton 3D Reconstruction Workspace</div>
+              <div class="hero-title">Cotton 3D Reconstruction Interface <span class="hero-build">Build {html.escape(build_label)}</span></div>
               <div class="hero-subtitle">
-                Academic interface for UAV-based cotton field analysis using pre-deflation and post-deflation imagery.
-                This environment supports scene-level 3D reconstruction, cotton-focused object-style analysis, and exportable research artifacts.
+                UAV cotton analytics workspace with scene-scale depth reconstruction, cotton isolation, and a dedicated object studio
+                for rotatable 3D inspection. Built to read like a technical demo, not a classroom toy.
               </div>
               <div class="hero-grid">
                 <div class="hero-card"><strong>Dataset Root</strong><span>{html.escape(str(DATASET_ROOT))}</span></div>
-                <div class="hero-card"><strong>Pre-Deflation Images</strong><span>{len(list_dataset_images("pre-deflation"))} indexed UAV frames</span></div>
-                <div class="hero-card"><strong>Post-Deflation Images</strong><span>{len(list_dataset_images("post-deflation"))} indexed UAV frames</span></div>
-                <div class="hero-card"><strong>Research Mode</strong><span>3D scene view, object-style cotton studio, and AI-assisted interpretation</span></div>
+                <div class="hero-card"><strong>Pre-Deflation</strong><span>{len(list_dataset_images("pre-deflation"))} indexed frames</span></div>
+                <div class="hero-card"><strong>Post-Deflation</strong><span>{len(list_dataset_images("post-deflation"))} indexed frames</span></div>
+                <div class="hero-card"><strong>Studio Output</strong><span>Scene 3D, cotton-focused 3D, and isolated object viewer</span></div>
               </div>
             </div>
             """
@@ -238,18 +303,15 @@ def create_app() -> gr.Blocks:
         gr.HTML(
             """
             <div class="section-note">
-              Upload a local UAV image or select a dataset frame. The system estimates depth, reconstructs a 3D point cloud,
-              generates a surface mesh, isolates likely cotton structures, and adds a dedicated object-style cotton studio similar to the interaction shown in your reference video.
+              Upload a local UAV image or select a dataset frame. The system preserves the existing scene reconstruction,
+              adds cotton isolation, and renders a separate object-style 3D studio view for closer inspection.
             </div>
             """
         )
 
-        summary_store = gr.State("")
-        cotton_metrics_store = gr.State("")
-
         with gr.Row():
             with gr.Column(scale=1, elem_classes=["panel-shell"]):
-                gr.Markdown("### Reconstruction Inputs")
+                gr.Markdown("### Inputs")
                 phase = gr.Radio(
                     choices=["pre-deflation", "post-deflation"],
                     value=initial_phase,
@@ -283,56 +345,32 @@ def create_app() -> gr.Blocks:
                     label="Depth estimation backend",
                 )
                 run_button = gr.Button("Generate 3D Reconstruction", variant="primary")
-                gr.Markdown(
-                    """
-                    **Interpretation**
-
-                    `auto`: tries MiDaS first if optional ML weights are installed.
-
-                    `heuristic`: lightweight fallback that works immediately for local testing.
-                    """
-                )
-                gr.Markdown("### AI Extension")
-                ai_prompt = gr.Textbox(
-                    label="Research-note prompt",
-                    value="Summarize the cotton depth structure and explain how it could support boll-depth analysis for an academic project.",
-                    lines=3,
-                )
-                ai_model = gr.Textbox(
-                    label="OpenAI model",
-                    value="gpt-5",
-                )
-                ai_button = gr.Button("Generate AI Research Note")
 
             with gr.Column(scale=2, elem_classes=["results-shell"]):
-                gr.Markdown("### Reconstruction Outputs")
+                gr.Markdown("### Outputs")
                 with gr.Tab("Input And Depth"):
                     preview_image = gr.Image(label="Input frame")
                     depth_preview = gr.Image(label="Estimated depth field")
                 with gr.Tab("Interactive 3D"):
-                    plot = gr.Plot(label="3D reconstruction viewer")
+                    plot = gr.Plot(label="Scene-scale 3D reconstruction")
                 with gr.Tab("Cotton Focus 3D"):
                     cotton_overlay = gr.Image(label="Cotton-candidate overlay")
                     cotton_plot = gr.Plot(label="Cotton-focused 3D viewer")
                 with gr.Tab("Cotton Object Studio"):
-                    gr.Markdown(
+                    gr.HTML(
                         """
-                        This mode keeps the existing reconstruction and adds a video-inspired object view:
-                        the likely cotton region is isolated on the left and exported as a rotatable 3D object on the right.
+                        <div class="studio-note">
+                          Video-style object mode: isolated cotton preview on the left and a reliable in-app rotatable 3D object renderer on the right.
+                        </div>
                         """
                     )
                     with gr.Row():
                         object_preview = gr.Image(label="Isolated cotton object preview")
-                        object_model = gr.Model3D(
-                            label="Rotatable cotton object model",
-                            clear_color=[0.07, 0.07, 0.07, 1.0],
-                        )
+                        object_plot = gr.Plot(label="Rotatable cotton object")
                 with gr.Tab("Exports"):
                     point_cloud_file = gr.File(label="Point cloud export (.ply)")
                     mesh_file = gr.File(label="Surface mesh export (.obj)")
                     depth_npy_file = gr.File(label="Depth tensor export (.npy)")
-                summary = gr.Textbox(label="Reconstruction summary", lines=8, interactive=False)
-                ai_note = gr.Textbox(label="AI research note", lines=12, interactive=False)
 
         phase.change(
             fn=update_image_choices,
@@ -349,20 +387,11 @@ def create_app() -> gr.Blocks:
                 cotton_overlay,
                 cotton_plot,
                 object_preview,
-                object_model,
+                object_plot,
                 point_cloud_file,
                 mesh_file,
                 depth_npy_file,
-                summary,
-                summary_store,
-                cotton_metrics_store,
-                ai_note,
             ],
-        )
-        ai_button.click(
-            fn=generate_research_note,
-            inputs=[summary_store, cotton_metrics_store, ai_prompt, ai_model],
-            outputs=[ai_note],
         )
 
     return demo
