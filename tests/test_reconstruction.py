@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from src.data import list_dataset_images
-from src.reconstruction import ReconstructionConfig, reconstruct_image_to_assets
+from src.reconstruction import ReconstructionConfig, detect_cotton_mask, reconstruct_image_to_assets
 
 
 def test_dataset_index_contains_pre_and_post_images():
@@ -22,3 +22,18 @@ def test_heuristic_reconstruction_generates_expected_outputs(tmp_path: Path):
     assert Path(result.point_cloud_file).exists()
     assert Path(result.mesh_file).exists()
     assert Path(result.depth_npy_file).exists()
+    assert "Cotton candidate coverage" in result.cotton_metrics
+
+
+def test_cotton_mask_detects_regions_for_sample():
+    from PIL import Image
+    import numpy as np
+
+    sample = list_dataset_images("pre-deflation")[0].path
+    image = Image.open(sample).convert("RGB").resize((256, 256))
+    rgb = np.asarray(image).astype(np.float32) / 255.0
+    depth = rgb.mean(axis=2)
+    mask = detect_cotton_mask(rgb, depth)
+
+    assert mask.shape == depth.shape
+    assert mask.dtype == bool

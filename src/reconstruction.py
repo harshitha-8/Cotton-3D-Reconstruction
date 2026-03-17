@@ -24,12 +24,15 @@ class ReconstructionResult:
     preview_image: Image.Image
     depth_preview: Image.Image
     figure: go.Figure
+    cotton_overlay: Image.Image
+    cotton_figure: go.Figure
     point_cloud_file: str
     mesh_file: str
     depth_npy_file: str
     output_dir: str
     num_points: int
     depth_strategy_used: str
+    cotton_metrics: str
 
 
 def reconstruct_image_to_assets(
@@ -44,6 +47,10 @@ def reconstruct_image_to_assets(
     depth, depth_strategy_used = estimate_depth(rgb, config.depth_strategy)
     points, colors = depth_to_point_cloud(rgb, depth, config.max_points, config.z_scale, config.xy_scale)
     figure = create_plotly_figure(points, colors)
+
+    cotton_mask = detect_cotton_mask(rgb, depth)
+    cotton_overlay = create_cotton_overlay(image, cotton_mask)
+    cotton_figure, cotton_metrics = create_cotton_focus_figure(rgb, depth, cotton_mask, config.z_scale)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = output_root / f"{image_path.stem}_{timestamp}"
@@ -67,12 +74,15 @@ def reconstruct_image_to_assets(
         preview_image=image,
         depth_preview=depth_preview,
         figure=figure,
+        cotton_overlay=cotton_overlay,
+        cotton_figure=cotton_figure,
         point_cloud_file=str(point_cloud_path),
         mesh_file=str(mesh_path),
         depth_npy_file=str(depth_npy_path),
         output_dir=str(output_dir),
         num_points=len(points),
         depth_strategy_used=depth_strategy_used,
+        cotton_metrics=cotton_metrics,
     )
 
 
@@ -197,6 +207,119 @@ def create_plotly_figure(points: np.ndarray, colors: np.ndarray) -> go.Figure:
     return figure
 
 
+def create_cotton_focus_figure(
+    rgb: np.ndarray,
+    depth: np.ndarray,
+    cotton_mask: np.ndarray,
+    z_scale: float,
+) -> tuple[go.Figure, str]:
+    if not np.any(cotton_mask):
+        empty = go.Figure()
+        empty.update_layout(
+            title="Cotton-focused 3D view unavailable",
+            annotations=[
+                dict(
+                    text="No clear cotton candidates were isolated in this frame.",
+                    x=0.5,
+                    y=0.5,
+                    xref="paper",
+                    yref="paper",
+                    showarrow=False,
+                )
+            ],
+            height=700,
+        )
+        return empty, "Cotton candidate coverage: 0.00%\nCotton objects detected: 0"
+
+    rows, cols = np.where(cotton_mask)
+    row_min, row_max = max(0, rows.min() - 6), min(depth.shape[0], rows.max() + 7)
+    col_min, col_max = max(0, cols.min() - 6), min(depth.shape[1], cols.max() + 7)
+
+    crop_depth = depth[row_min:row_max, col_min:col_max]
+    crop_rgb = rgb[row_min:row_max, col_min:col_max]
+    crop_mask = cotton_mask[row_min:row_max, col_min:col_max]
+
+    surface_z = np.where(crop_mask, crop_depth * z_scale, np.nan)
+    marker_rows, marker_cols = np.where(crop_mask)
+    x_coords = marker_cols.astype(np.float32)
+    y_coords = (crop_depth.shape[0] - marker_rows).astype(np.float32)
+    z_coords = crop_depth[marker_rows, marker_cols].astype(np.float32) * z_scale
+    marker_colors = crop_rgb[marker_rows, marker_cols]
+    color_strings = [
+        f"rgb({int(r * 255)}, {int(g * 255)}, {int(b * 255)})"
+        for r, g, b in marker_colors
+    ]
+
+    highlight_mask = crop_mask & (crop_rgb.mean(axis=2) > np.quantile(crop_rgb.mean(axis=2)[crop_mask], 0.75))
+    hi_rows, hi_cols = np.where(highlight_mask)
+
+    figure = go.Figure()
+    figure.add_trace(
+        go.Surface(
+            z=surface_z,
+            surfacecolor=surface_z,
+            colorscale=[
+                [0.0, "#7c5a46"],
+                [0.35, "#a57b63"],
+                [0.72, "#d1b39f"],
+                [1.0, "#f7efe6"],
+            ],
+            opacity=0.92,
+            showscale=False,
+            name="Cotton surface",
+        )
+    )
+    figure.add_trace(
+        go.Scatter3d(
+            x=x_coords,
+            y=y_coords,
+            z=z_coords,
+            mode="markers",
+            marker={"size": 3.0, "color": color_strings, "opacity": 0.7},
+            name="Cotton structure",
+        )
+    )
+    if len(hi_rows) > 0:
+        figure.add_trace(
+            go.Scatter3d(
+                x=hi_cols.astype(np.float32),
+                y=(crop_depth.shape[0] - hi_rows).astype(np.float32),
+                z=crop_depth[hi_rows, hi_cols].astype(np.float32) * z_scale + 1.0,
+                mode="markers",
+                marker={"size": 4.8, "color": "#fff9ef", "opacity": 0.98},
+                name="Bright cotton candidates",
+            )
+        )
+
+    figure.update_layout(
+        height=700,
+        margin=dict(l=0, r=0, t=46, b=0),
+        title="Cotton-focused rotatable 3D reconstruction",
+        scene=dict(
+            xaxis_title="Image X",
+            yaxis_title="Image Y",
+            zaxis_title="Estimated depth",
+            aspectmode="data",
+            camera=dict(eye=dict(x=1.7, y=1.45, z=0.9)),
+        ),
+    )
+
+    coverage = float(cotton_mask.mean() * 100.0)
+    object_count, component_areas = connected_component_sizes(cotton_mask)
+    cotton_depth = depth[cotton_mask]
+    metrics = "\n".join(
+        [
+            f"Cotton candidate coverage: {coverage:.2f}%",
+            f"Cotton objects detected: {object_count}",
+            f"Mean cotton depth score: {float(cotton_depth.mean()):.3f}",
+            f"Peak cotton depth score: {float(cotton_depth.max()):.3f}",
+            f"Largest component size: {max(component_areas) if component_areas else 0} pixels",
+            "Interaction: drag in the 3D view to rotate, zoom, and inspect cotton structure.",
+        ]
+    )
+    return figure, metrics
+
+
 def save_point_cloud(path: Path, points: np.ndarray, colors: np.ndarray) -> None:
     color_bytes = (colors.clip(0.0, 1.0) * 255).astype(np.uint8)
     cloud = trimesh.points.PointCloud(vertices=points, colors=color_bytes)
@@ -239,3 +362,122 @@ def _resize_preserving_aspect(image: Image.Image, long_edge: int) -> Image.Image
     scale = long_edge / max(width, height)
     new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
     return image.resize(new_size, Image.Resampling.LANCZOS)
+
+
+def detect_cotton_mask(rgb: np.ndarray, depth: np.ndarray) -> np.ndarray:
+    hsv = rgb_to_hsv(rgb)
+    value = hsv[..., 2]
+    saturation = hsv[..., 1]
+
+    brightness_threshold = float(np.quantile(value, 0.78))
+    low_saturation_threshold = float(np.quantile(saturation, 0.55))
+    depth_threshold = float(np.quantile(depth, 0.68))
+
+    bright_whites = (value >= brightness_threshold) & (saturation <= low_saturation_threshold)
+    elevated_texture = (value >= np.quantile(value, 0.63)) & (depth >= depth_threshold)
+    mask = bright_whites | elevated_texture
+    mask = smooth_binary_mask(mask, rounds=2)
+    return keep_large_components(mask, min_size=max(24, int(mask.size * 0.00045)))
+
+
+def create_cotton_overlay(image: Image.Image, cotton_mask: np.ndarray) -> Image.Image:
+    base = np.asarray(image).astype(np.uint8)
+    overlay = base.copy()
+    tint = np.array([217, 84, 139], dtype=np.uint8)
+    overlay[cotton_mask] = (
+        0.55 * overlay[cotton_mask].astype(np.float32) + 0.45 * tint.astype(np.float32)
+    ).astype(np.uint8)
+    return Image.fromarray(overlay)
+
+
+def rgb_to_hsv(rgb: np.ndarray) -> np.ndarray:
+    r = rgb[..., 0]
+    g = rgb[..., 1]
+    b = rgb[..., 2]
+    maxc = np.max(rgb, axis=2)
+    minc = np.min(rgb, axis=2)
+    delta = maxc - minc
+
+    saturation = np.where(maxc == 0, 0, delta / np.clip(maxc, 1e-8, None))
+    hue = np.zeros_like(maxc)
+
+    nonzero = delta > 1e-8
+    r_mask = nonzero & (maxc == r)
+    g_mask = nonzero & (maxc == g)
+    b_mask = nonzero & (maxc == b)
+
+    hue[r_mask] = ((g[r_mask] - b[r_mask]) / delta[r_mask]) % 6
+    hue[g_mask] = ((b[g_mask] - r[g_mask]) / delta[g_mask]) + 2
+    hue[b_mask] = ((r[b_mask] - g[b_mask]) / delta[b_mask]) + 4
+    hue /= 6.0
+
+    return np.stack([hue, saturation, maxc], axis=2).astype(np.float32)
+
+
+def smooth_binary_mask(mask: np.ndarray, rounds: int = 2) -> np.ndarray:
+    mask = mask.astype(bool)
+    for _ in range(rounds):
+        neighbors = sum(
+            np.roll(np.roll(mask, dy, axis=0), dx, axis=1)
+            for dy in (-1, 0, 1)
+            for dx in (-1, 0, 1)
+            if not (dy == 0 and dx == 0)
+        )
+        mask = (mask & (neighbors >= 2)) | (neighbors >= 4)
+        mask[0, :] = False
+        mask[-1, :] = False
+        mask[:, 0] = False
+        mask[:, -1] = False
+    return mask
+
+
+def keep_large_components(mask: np.ndarray, min_size: int) -> np.ndarray:
+    h, w = mask.shape
+    visited = np.zeros_like(mask, dtype=bool)
+    kept = np.zeros_like(mask, dtype=bool)
+
+    for row in range(h):
+        for col in range(w):
+            if not mask[row, col] or visited[row, col]:
+                continue
+            stack = [(row, col)]
+            component: list[tuple[int, int]] = []
+            visited[row, col] = True
+            while stack:
+                current_row, current_col = stack.pop()
+                component.append((current_row, current_col))
+                for d_row, d_col in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    next_row = current_row + d_row
+                    next_col = current_col + d_col
+                    if 0 <= next_row < h and 0 <= next_col < w and mask[next_row, next_col] and not visited[next_row, next_col]:
+                        visited[next_row, next_col] = True
+                        stack.append((next_row, next_col))
+            if len(component) >= min_size:
+                for current_row, current_col in component:
+                    kept[current_row, current_col] = True
+    return kept
+
+
+def connected_component_sizes(mask: np.ndarray) -> tuple[int, list[int]]:
+    h, w = mask.shape
+    visited = np.zeros_like(mask, dtype=bool)
+    sizes: list[int] = []
+
+    for row in range(h):
+        for col in range(w):
+            if not mask[row, col] or visited[row, col]:
+                continue
+            stack = [(row, col)]
+            visited[row, col] = True
+            size = 0
+            while stack:
+                current_row, current_col = stack.pop()
+                size += 1
+                for d_row, d_col in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    next_row = current_row + d_row
+                    next_col = current_col + d_col
+                    if 0 <= next_row < h and 0 <= next_col < w and mask[next_row, next_col] and not visited[next_row, next_col]:
+                        visited[next_row, next_col] = True
+                        stack.append((next_row, next_col))
+            sizes.append(size)
+    return len(sizes), sorted(sizes, reverse=True)

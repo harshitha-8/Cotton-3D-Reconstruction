@@ -58,6 +58,12 @@ Optional depth-model extras:
 pip install -r requirements-ml.txt
 ```
 
+Optional LLM extension:
+
+```bash
+pip install -r requirements-llm.txt
+```
+
 ## Run
 
 ```bash
@@ -100,6 +106,17 @@ If you want to test the reconstruction without the browser first:
 ```bash
 python3 reconstruct_local.py "/Volumes/T9/ICML/Part_one_pre_def_rgb/DJI_20250929100235_0457_D.JPG"
 ```
+
+## Cotton-Focused 3D Mode
+
+The interface now includes an additional cotton-focused feature inspired by object-centric 3D viewers:
+
+- a cotton-candidate overlay image
+- a dedicated rotatable cotton-focused 3D view
+- estimated cotton depth and coverage metrics
+- an optional AI-generated research note
+
+The new view keeps the existing scene-level reconstruction and adds a second analysis layer for likely cotton structures. This remains a single-image depth-based approximation, so it is best used for exploratory analysis and qualitative reporting rather than geometric ground truth.
 
 ## Outputs
 

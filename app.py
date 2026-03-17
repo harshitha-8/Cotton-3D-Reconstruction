@@ -9,11 +9,11 @@ from typing import Optional
 import gradio as gr
 
 from src.data import DATASET_ROOT, list_dataset_images, resolve_dataset_image
+from src.insights import generate_research_note
 from src.reconstruction import ReconstructionConfig, reconstruct_image_to_assets
 
 
 OUTPUT_ROOT = Path("outputs")
-DEFAULT_CONFIG = ReconstructionConfig()
 DEFAULT_PREFERRED_PORT = 8907
 APP_CSS = """
 body, .gradio-container {
@@ -192,14 +192,20 @@ def run_reconstruction(
             f"Output folder: {result.output_dir}",
         ]
     )
+    display_summary = f"{summary}\n{result.cotton_metrics}"
     return (
         result.preview_image,
         result.depth_preview,
         result.figure,
+        result.cotton_overlay,
+        result.cotton_figure,
         result.point_cloud_file,
         result.mesh_file,
         result.depth_npy_file,
+        display_summary,
         summary,
+        result.cotton_metrics,
+        "",
     )
 
 
@@ -215,14 +221,13 @@ def create_app() -> gr.Blocks:
               <div class="hero-title">Cotton 3D Reconstruction Workspace</div>
               <div class="hero-subtitle">
                 Academic interface for UAV-based cotton field analysis using pre-deflation and post-deflation imagery.
-                This environment supports single-image 3D approximation, dataset browsing, and exportable reconstruction artifacts
-                for downstream contour analysis and research reporting.
+                This environment supports scene-level 3D reconstruction, cotton-focused object-style analysis, and exportable research artifacts.
               </div>
               <div class="hero-grid">
                 <div class="hero-card"><strong>Dataset Root</strong><span>{html.escape(str(DATASET_ROOT))}</span></div>
                 <div class="hero-card"><strong>Pre-Deflation Images</strong><span>{len(list_dataset_images("pre-deflation"))} indexed UAV frames</span></div>
                 <div class="hero-card"><strong>Post-Deflation Images</strong><span>{len(list_dataset_images("post-deflation"))} indexed UAV frames</span></div>
-                <div class="hero-card"><strong>Research Mode</strong><span>Single-image depth reconstruction with exportable 3D outputs</span></div>
+                <div class="hero-card"><strong>Research Mode</strong><span>3D scene view, cotton isolation, and AI-assisted interpretation</span></div>
               </div>
             </div>
             """
@@ -232,10 +237,13 @@ def create_app() -> gr.Blocks:
             """
             <div class="section-note">
               Upload a local UAV image or select a dataset frame. The system estimates depth, reconstructs a 3D point cloud,
-              generates a surface mesh, and renders the result in an interactive Plotly viewer.
+              generates a surface mesh, isolates likely cotton structures, and adds a dedicated rotatable cotton-focused 3D view.
             </div>
             """
         )
+
+        summary_store = gr.State("")
+        cotton_metrics_store = gr.State("")
 
         with gr.Row():
             with gr.Column(scale=1, elem_classes=["panel-shell"]):
@@ -282,6 +290,17 @@ def create_app() -> gr.Blocks:
                     `heuristic`: lightweight fallback that works immediately for local testing.
                     """
                 )
+                gr.Markdown("### AI Extension")
+                ai_prompt = gr.Textbox(
+                    label="Research-note prompt",
+                    value="Summarize the cotton depth structure and explain how it could support boll-depth analysis for an academic project.",
+                    lines=3,
+                )
+                ai_model = gr.Textbox(
+                    label="OpenAI model",
+                    value="gpt-5",
+                )
+                ai_button = gr.Button("Generate AI Research Note")
 
             with gr.Column(scale=2, elem_classes=["results-shell"]):
                 gr.Markdown("### Reconstruction Outputs")
@@ -290,11 +309,15 @@ def create_app() -> gr.Blocks:
                     depth_preview = gr.Image(label="Estimated depth field")
                 with gr.Tab("Interactive 3D"):
                     plot = gr.Plot(label="3D reconstruction viewer")
+                with gr.Tab("Cotton Focus 3D"):
+                    cotton_overlay = gr.Image(label="Cotton-candidate overlay")
+                    cotton_plot = gr.Plot(label="Cotton-focused 3D viewer")
                 with gr.Tab("Exports"):
                     point_cloud_file = gr.File(label="Point cloud export (.ply)")
                     mesh_file = gr.File(label="Surface mesh export (.obj)")
                     depth_npy_file = gr.File(label="Depth tensor export (.npy)")
-                summary = gr.Textbox(label="Reconstruction summary", lines=6, interactive=False)
+                summary = gr.Textbox(label="Reconstruction summary", lines=8, interactive=False)
+                ai_note = gr.Textbox(label="AI research note", lines=12, interactive=False)
 
         phase.change(
             fn=update_image_choices,
@@ -308,11 +331,21 @@ def create_app() -> gr.Blocks:
                 preview_image,
                 depth_preview,
                 plot,
+                cotton_overlay,
+                cotton_plot,
                 point_cloud_file,
                 mesh_file,
                 depth_npy_file,
                 summary,
+                summary_store,
+                cotton_metrics_store,
+                ai_note,
             ],
+        )
+        ai_button.click(
+            fn=generate_research_note,
+            inputs=[summary_store, cotton_metrics_store, ai_prompt, ai_model],
+            outputs=[ai_note],
         )
 
     return demo
