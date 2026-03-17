@@ -61,12 +61,31 @@ pip install -r requirements-ml.txt
 ## Run
 
 ```bash
-python3 app.py
+source .venv/bin/activate
+python3 run_local.py
 ```
 
 Then open:
 
-- [http://127.0.0.1:7860](http://127.0.0.1:7860)
+- the exact `http://127.0.0.1:<port>` URL printed in the terminal
+
+The app auto-selects a free localhost port between `8860` and `8999`, so it avoids ports that are already in use.
+
+If you want to force a specific port:
+
+```bash
+COTTON3D_PORT=8907 python3 run_local.py
+```
+
+Recommended fixed local port on your Mac if you want a stable URL:
+
+```bash
+COTTON3D_PORT=8907 python3 run_local.py
+```
+
+That will give you:
+
+- [http://127.0.0.1:8907](http://127.0.0.1:8907)
 
 ## Tests
 
@@ -74,6 +93,12 @@ Run the lightweight smoke tests with:
 
 ```bash
 pytest
+```
+
+If you want to test the reconstruction without the browser first:
+
+```bash
+python3 reconstruct_local.py "/Volumes/T9/ICML/Part_one_pre_def_rgb/DJI_20250929100235_0457_D.JPG"
 ```
 
 ## Outputs

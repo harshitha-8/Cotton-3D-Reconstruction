@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import socket
 from pathlib import Path
 from typing import Optional
 
@@ -11,6 +13,22 @@ from src.reconstruction import ReconstructionConfig, reconstruct_image_to_assets
 
 OUTPUT_ROOT = Path("outputs")
 DEFAULT_CONFIG = ReconstructionConfig()
+
+
+def find_free_port(start: int = 8860, end: int = 8999) -> int:
+    requested = os.getenv("COTTON3D_PORT")
+    if requested:
+        return int(requested)
+
+    for port in range(start, end + 1):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind(("127.0.0.1", port))
+                return port
+            except OSError:
+                continue
+    raise RuntimeError(f"No free port found between {start} and {end}.")
 
 
 def build_dataset_choices(phase: str) -> list[str]:
@@ -75,10 +93,7 @@ def create_app() -> gr.Blocks:
     initial_choices = build_dataset_choices(initial_phase)
     initial_value = initial_choices[0] if initial_choices else None
 
-    with gr.Blocks(
-        title="Cotton 3D Reconstruction",
-        theme=gr.themes.Soft(),
-    ) as demo:
+    with gr.Blocks(title="Cotton 3D Reconstruction") as demo:
         gr.Markdown(
             """
             # Cotton 3D Reconstruction Demo
@@ -164,4 +179,7 @@ def create_app() -> gr.Blocks:
 
 if __name__ == "__main__":
     app = create_app()
-    app.launch(server_name="0.0.0.0", server_port=7860)
+    port = find_free_port()
+    url = f"http://127.0.0.1:{port}"
+    print(f"Cotton 3D app starting at {url}")
+    app.launch(server_name="127.0.0.1", server_port=port, inbrowser=False)
