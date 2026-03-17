@@ -26,6 +26,8 @@ class ReconstructionResult:
     figure: go.Figure
     cotton_overlay: Image.Image
     cotton_figure: go.Figure
+    object_preview: Image.Image
+    object_model_file: str
     point_cloud_file: str
     mesh_file: str
     depth_npy_file: str
@@ -60,15 +62,20 @@ def reconstruct_image_to_assets(
     depth_preview_path = output_dir / "depth_preview.png"
     point_cloud_path = output_dir / "point_cloud.ply"
     mesh_path = output_dir / "surface_mesh.obj"
+    object_mesh_path = output_dir / "cotton_object.obj"
     depth_npy_path = output_dir / "depth.npy"
+    object_preview_path = output_dir / "cotton_object_preview.png"
 
     image.save(preview_path)
     depth_preview = depth_to_image(depth)
     depth_preview.save(depth_preview_path)
     np.save(depth_npy_path, depth)
+    object_preview = create_object_preview(image, cotton_mask)
+    object_preview.save(object_preview_path)
 
     save_point_cloud(point_cloud_path, points, colors)
     save_surface_mesh(mesh_path, rgb, depth, config.z_scale, config.xy_scale)
+    save_object_mesh(object_mesh_path, rgb, depth, cotton_mask, config.z_scale, config.xy_scale)
 
     return ReconstructionResult(
         preview_image=image,
@@ -76,6 +83,8 @@ def reconstruct_image_to_assets(
         figure=figure,
         cotton_overlay=cotton_overlay,
         cotton_figure=cotton_figure,
+        object_preview=object_preview,
+        object_model_file=str(object_mesh_path),
         point_cloud_file=str(point_cloud_path),
         mesh_file=str(mesh_path),
         depth_npy_file=str(depth_npy_path),
@@ -390,6 +399,22 @@ def create_cotton_overlay(image: Image.Image, cotton_mask: np.ndarray) -> Image.
     return Image.fromarray(overlay)
 
 
+def create_object_preview(image: Image.Image, cotton_mask: np.ndarray) -> Image.Image:
+    base = np.asarray(image).astype(np.uint8)
+    rows, cols = np.where(cotton_mask)
+    if len(rows) == 0:
+        return image
+    row_min, row_max = max(0, rows.min() - 12), min(base.shape[0], rows.max() + 13)
+    col_min, col_max = max(0, cols.min() - 12), min(base.shape[1], cols.max() + 13)
+    crop = base[row_min:row_max, col_min:col_max].copy()
+    crop_mask = cotton_mask[row_min:row_max, col_min:col_max]
+    background = np.full_like(crop, 18, dtype=np.uint8)
+    preview = np.where(crop_mask[..., None], crop, background)
+    border = dilate_mask(crop_mask, rounds=1) & ~crop_mask
+    preview[border] = np.array([217, 84, 139], dtype=np.uint8)
+    return Image.fromarray(preview)
+
+
 def rgb_to_hsv(rgb: np.ndarray) -> np.ndarray:
     r = rgb[..., 0]
     g = rgb[..., 1]
@@ -424,6 +449,23 @@ def smooth_binary_mask(mask: np.ndarray, rounds: int = 2) -> np.ndarray:
             if not (dy == 0 and dx == 0)
         )
         mask = (mask & (neighbors >= 2)) | (neighbors >= 4)
+        mask[0, :] = False
+        mask[-1, :] = False
+        mask[:, 0] = False
+        mask[:, -1] = False
+    return mask
+
+
+def dilate_mask(mask: np.ndarray, rounds: int = 1) -> np.ndarray:
+    mask = mask.astype(bool)
+    for _ in range(rounds):
+        mask = np.logical_or.reduce(
+            [
+                np.roll(np.roll(mask, dy, axis=0), dx, axis=1)
+                for dy in (-1, 0, 1)
+                for dx in (-1, 0, 1)
+            ]
+        )
         mask[0, :] = False
         mask[-1, :] = False
         mask[:, 0] = False
@@ -481,3 +523,59 @@ def connected_component_sizes(mask: np.ndarray) -> tuple[int, list[int]]:
                         stack.append((next_row, next_col))
             sizes.append(size)
     return len(sizes), sorted(sizes, reverse=True)
+
+
+def save_object_mesh(path: Path, rgb: np.ndarray, depth: np.ndarray, cotton_mask: np.ndarray, z_scale: float, xy_scale: float) -> None:
+    rows, cols = np.where(cotton_mask)
+    if len(rows) == 0:
+        save_surface_mesh(path, rgb, depth, z_scale, xy_scale)
+        return
+
+    row_min, row_max = max(0, rows.min() - 6), min(depth.shape[0], rows.max() + 7)
+    col_min, col_max = max(0, cols.min() - 6), min(depth.shape[1], cols.max() + 7)
+
+    crop_depth = depth[row_min:row_max, col_min:col_max]
+    crop_rgb = rgb[row_min:row_max, col_min:col_max]
+    crop_mask = cotton_mask[row_min:row_max, col_min:col_max]
+
+    h, w = crop_depth.shape
+    yy, xx = np.mgrid[0:h, 0:w]
+    vertices = np.column_stack(
+        [
+            (xx.astype(np.float32) - w / 2.0) * xy_scale,
+            ((h - yy).astype(np.float32) - h / 2.0) * xy_scale,
+            crop_depth.astype(np.float32) * z_scale,
+        ]
+    ).reshape(-1, 3)
+    vertex_colors = (crop_rgb.reshape(-1, 3).clip(0.0, 1.0) * 255).astype(np.uint8)
+
+    faces = []
+    for row in range(h - 1):
+        for col in range(w - 1):
+            quad_mask = [
+                crop_mask[row, col],
+                crop_mask[row + 1, col],
+                crop_mask[row, col + 1],
+                crop_mask[row + 1, col + 1],
+            ]
+            if sum(quad_mask) < 3:
+                continue
+            top_left = row * w + col
+            top_right = top_left + 1
+            bottom_left = top_left + w
+            bottom_right = bottom_left + 1
+            faces.append([top_left, bottom_left, top_right])
+            faces.append([top_right, bottom_left, bottom_right])
+
+    if not faces:
+        save_surface_mesh(path, crop_rgb, crop_depth, z_scale, xy_scale)
+        return
+
+    mesh = trimesh.Trimesh(
+        vertices=vertices,
+        faces=np.asarray(faces),
+        vertex_colors=vertex_colors,
+        process=True,
+    )
+    mesh.remove_unreferenced_vertices()
+    mesh.export(path)

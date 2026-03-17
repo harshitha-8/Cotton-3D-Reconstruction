@@ -113,6 +113,7 @@ The interface now includes an additional cotton-focused feature inspired by obje
 
 - a cotton-candidate overlay image
 - a dedicated rotatable cotton-focused 3D view
+- a separate `Cotton Object Studio` tab with an isolated object preview and rotatable 3D object
 - estimated cotton depth and coverage metrics
 - an optional AI-generated research note
 

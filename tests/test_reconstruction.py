@@ -22,6 +22,7 @@ def test_heuristic_reconstruction_generates_expected_outputs(tmp_path: Path):
     assert Path(result.point_cloud_file).exists()
     assert Path(result.mesh_file).exists()
     assert Path(result.depth_npy_file).exists()
+    assert Path(result.object_model_file).exists()
     assert "Cotton candidate coverage" in result.cotton_metrics
 
 

@@ -199,6 +199,8 @@ def run_reconstruction(
         result.figure,
         result.cotton_overlay,
         result.cotton_figure,
+        result.object_preview,
+        result.object_model_file,
         result.point_cloud_file,
         result.mesh_file,
         result.depth_npy_file,
@@ -227,7 +229,7 @@ def create_app() -> gr.Blocks:
                 <div class="hero-card"><strong>Dataset Root</strong><span>{html.escape(str(DATASET_ROOT))}</span></div>
                 <div class="hero-card"><strong>Pre-Deflation Images</strong><span>{len(list_dataset_images("pre-deflation"))} indexed UAV frames</span></div>
                 <div class="hero-card"><strong>Post-Deflation Images</strong><span>{len(list_dataset_images("post-deflation"))} indexed UAV frames</span></div>
-                <div class="hero-card"><strong>Research Mode</strong><span>3D scene view, cotton isolation, and AI-assisted interpretation</span></div>
+                <div class="hero-card"><strong>Research Mode</strong><span>3D scene view, object-style cotton studio, and AI-assisted interpretation</span></div>
               </div>
             </div>
             """
@@ -237,7 +239,7 @@ def create_app() -> gr.Blocks:
             """
             <div class="section-note">
               Upload a local UAV image or select a dataset frame. The system estimates depth, reconstructs a 3D point cloud,
-              generates a surface mesh, isolates likely cotton structures, and adds a dedicated rotatable cotton-focused 3D view.
+              generates a surface mesh, isolates likely cotton structures, and adds a dedicated object-style cotton studio similar to the interaction shown in your reference video.
             </div>
             """
         )
@@ -312,6 +314,19 @@ def create_app() -> gr.Blocks:
                 with gr.Tab("Cotton Focus 3D"):
                     cotton_overlay = gr.Image(label="Cotton-candidate overlay")
                     cotton_plot = gr.Plot(label="Cotton-focused 3D viewer")
+                with gr.Tab("Cotton Object Studio"):
+                    gr.Markdown(
+                        """
+                        This mode keeps the existing reconstruction and adds a video-inspired object view:
+                        the likely cotton region is isolated on the left and exported as a rotatable 3D object on the right.
+                        """
+                    )
+                    with gr.Row():
+                        object_preview = gr.Image(label="Isolated cotton object preview")
+                        object_model = gr.Model3D(
+                            label="Rotatable cotton object model",
+                            clear_color=[0.07, 0.07, 0.07, 1.0],
+                        )
                 with gr.Tab("Exports"):
                     point_cloud_file = gr.File(label="Point cloud export (.ply)")
                     mesh_file = gr.File(label="Surface mesh export (.obj)")
@@ -333,6 +348,8 @@ def create_app() -> gr.Blocks:
                 plot,
                 cotton_overlay,
                 cotton_plot,
+                object_preview,
+                object_model,
                 point_cloud_file,
                 mesh_file,
                 depth_npy_file,
