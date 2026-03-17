@@ -17,24 +17,20 @@ OUTPUT_ROOT = Path("outputs")
 DEFAULT_PREFERRED_PORT = 8907
 APP_CSS = """
 :root {
-  --bg-0: #08111d;
-  --bg-1: #0e1b2d;
-  --panel: #12233a;
-  --panel-2: #172b45;
-  --line: rgba(125, 174, 255, 0.22);
-  --text: #eef4ff;
-  --muted: #b8c6de;
-  --accent: #53d1ff;
-  --accent-2: #7b7cff;
-  --accent-3: #ff8f5c;
-  --surface: #f7faff;
-  --surface-text: #10233b;
+  --bg-0: #eef5fb;
+  --bg-1: #dce8f6;
+  --panel: rgba(255, 255, 255, 0.95);
+  --line: rgba(32, 70, 108, 0.10);
+  --text: #16314f;
+  --muted: #617992;
+  --accent: #0284c7;
+  --accent-2: #2563eb;
 }
 
 body, .gradio-container {
   background:
-    radial-gradient(circle at top left, rgba(83, 209, 255, 0.12), transparent 26%),
-    radial-gradient(circle at bottom right, rgba(123, 124, 255, 0.16), transparent 24%),
+    radial-gradient(circle at top left, rgba(2, 132, 199, 0.10), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.08), transparent 24%),
     linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
   color: var(--text);
   font-family: "Avenir Next", "Segoe UI", sans-serif;
@@ -45,24 +41,13 @@ body, .gradio-container {
 }
 
 .hero-panel {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, #0d2038, #142844);
-  color: var(--text);
+  background: linear-gradient(135deg, #15507e, #2563eb);
+  color: #ffffff;
   padding: 28px 30px;
   border-radius: 28px;
-  border: 1px solid rgba(110, 173, 255, 0.2);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 18px 42px rgba(37, 99, 235, 0.14);
   margin-bottom: 18px;
-}
-
-.hero-panel::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, transparent 0%, rgba(83, 209, 255, 0.06) 48%, transparent 100%);
-  pointer-events: none;
 }
 
 .hero-title {
@@ -70,7 +55,7 @@ body, .gradio-container {
   font-weight: 700;
   letter-spacing: -0.03em;
   margin-bottom: 10px;
-  color: #f4f8ff;
+  color: #ffffff;
 }
 
 .hero-build {
@@ -78,9 +63,9 @@ body, .gradio-container {
   margin-left: 10px;
   padding: 5px 10px;
   border-radius: 999px;
-  background: rgba(83, 209, 255, 0.08);
-  border: 1px solid rgba(83, 209, 255, 0.22);
-  color: #aee8ff;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #ffffff;
   font-size: 0.82rem;
   vertical-align: middle;
 }
@@ -88,7 +73,7 @@ body, .gradio-container {
 .hero-subtitle {
   max-width: 1040px;
   line-height: 1.7;
-  color: #d5dff2;
+  color: rgba(255, 255, 255, 0.92);
   margin-bottom: 18px;
 }
 
@@ -99,8 +84,8 @@ body, .gradio-container {
 }
 
 .hero-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(115, 161, 255, 0.18);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 18px;
   padding: 14px 16px;
 }
@@ -110,24 +95,24 @@ body, .gradio-container {
   font-size: 0.76rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #82b0ff;
+  color: rgba(233, 242, 255, 0.90);
   margin-bottom: 6px;
 }
 
 .hero-card span {
   font-size: 1rem;
   line-height: 1.5;
-  color: #e8efff;
+  color: #ffffff;
 }
 
 .section-note {
-  background: #13253d;
-  border: 1px solid rgba(115, 161, 255, 0.18);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(32, 70, 108, 0.08);
   border-radius: 20px;
   padding: 16px 18px;
   margin-bottom: 16px;
-  color: #dde8fb;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  color: var(--text);
+  box-shadow: 0 10px 24px rgba(60, 88, 118, 0.08);
 }
 
 .panel-shell, .results-shell {
@@ -135,29 +120,23 @@ body, .gradio-container {
   border: 1px solid var(--line);
   border-radius: 24px;
   padding: 14px;
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 16px 34px rgba(60, 88, 118, 0.08);
 }
 
 .studio-note {
-  background: #112840;
-  border: 1px solid rgba(83, 209, 255, 0.18);
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.08), rgba(37, 99, 235, 0.06));
+  border: 1px solid rgba(37, 99, 235, 0.10);
   border-radius: 18px;
   padding: 14px 16px;
   margin-bottom: 12px;
-  color: #e5efff;
+  color: var(--text);
 }
 
 button.primary {
   background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
-  color: #06111f !important;
+  color: #ffffff !important;
   border: none !important;
-  box-shadow: 0 10px 24px rgba(83, 209, 255, 0.28);
-}
-
-.gradio-container .block,
-.gradio-container .form,
-.gradio-container .tabitem {
-  border-color: rgba(115, 161, 255, 0.14) !important;
+  box-shadow: 0 12px 22px rgba(37, 99, 235, 0.18);
 }
 
 .gradio-container h1,
@@ -166,31 +145,38 @@ button.primary {
 .gradio-container h4,
 .gradio-container p,
 .gradio-container span,
-.gradio-container strong {
-  color: var(--text);
-}
-
+.gradio-container strong,
 .gradio-container label,
-.gradio-container .prose,
 .gradio-container .md,
-.gradio-container .tabs,
-.gradio-container .tab-nav button {
+.gradio-container .prose {
   color: var(--text) !important;
 }
 
+.gradio-container .tab-nav {
+  border-bottom: 1px solid rgba(32, 70, 108, 0.10) !important;
+}
+
+.gradio-container .tab-nav button {
+  color: var(--muted) !important;
+}
+
 .gradio-container .tab-nav button.selected {
-  color: #ffffff !important;
+  color: var(--text) !important;
   border-bottom-color: var(--accent) !important;
+  background: rgba(2, 132, 199, 0.08) !important;
 }
 
 .gradio-container input,
 .gradio-container textarea,
 .gradio-container select {
-  background: var(--surface) !important;
-  color: var(--surface-text) !important;
-  border: 1px solid #c7d5ea !important;
+  background: #ffffff !important;
+  color: #10233b !important;
+  border: 1px solid #cad7e5 !important;
 }
 
+.gradio-container .block,
+.gradio-container .form,
+.gradio-container .tabitem,
 .gradio-container .wrap,
 .gradio-container .dropdown,
 .gradio-container .input-container,
@@ -202,56 +188,14 @@ button.primary {
 .gradio-container .block.gradio-image,
 .gradio-container .block.gradio-file,
 .gradio-container .block.gradio-plot {
-  background: #18304f !important;
-  color: var(--text) !important;
-}
-
-.gradio-container .form,
-.gradio-container .block {
-  color: var(--text) !important;
-}
-
-.gradio-container .tabitem {
   background: transparent !important;
-}
-
-.gradio-container .tab-nav {
-  border-bottom: 1px solid rgba(125, 174, 255, 0.2) !important;
-}
-
-.gradio-container .tab-nav button {
-  opacity: 0.92;
-}
-
-.gradio-container .tab-nav button:not(.selected) {
-  color: #b7c7e4 !important;
-}
-
-.gradio-container [data-testid="textbox"],
-.gradio-container [data-testid="dropdown"],
-.gradio-container [data-testid="radio"],
-.gradio-container [data-testid="slider"] {
   color: var(--text) !important;
 }
 
-.gradio-container .block.gradio-textbox input,
-.gradio-container .block.gradio-dropdown input,
-.gradio-container .block.gradio-dropdown button,
-.gradio-container .block.gradio-dropdown span {
-  color: var(--surface-text) !important;
-}
-
-.gradio-container .gradio-radio label,
-.gradio-container .gradio-dropdown label,
-.gradio-container .gradio-slider label,
-.gradio-container .gradio-image label,
-.gradio-container .gradio-file label {
-  color: #eef4ff !important;
-}
-
-.gradio-container .block.gradio-dropdown .wrap,
-.gradio-container .block.gradio-textbox .wrap {
-  background: transparent !important;
+.gradio-container .block.gradio-image,
+.gradio-container .block.gradio-plot,
+.gradio-container .block.gradio-file {
+  border-radius: 18px !important;
 }
 
 @media (max-width: 1100px) {
@@ -366,7 +310,7 @@ def create_app() -> gr.Blocks:
               <div class="hero-title">Cotton 3D Reconstruction Interface <span class="hero-build">Build {html.escape(build_label)}</span></div>
               <div class="hero-subtitle">
                 UAV cotton analytics workspace with scene-scale depth reconstruction, cotton isolation, and a dedicated object studio
-                for rotatable 3D inspection. Built to read like a technical demo, not a classroom toy.
+                for rotatable 3D inspection. Designed to feel clean, technical, and presentation-ready.
               </div>
               <div class="hero-grid">
                 <div class="hero-card"><strong>Dataset Root</strong><span>{html.escape(str(DATASET_ROOT))}</span></div>
