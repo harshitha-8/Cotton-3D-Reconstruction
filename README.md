@@ -52,6 +52,12 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Optional depth-model extras:
+
+```bash
+pip install -r requirements-ml.txt
+```
+
 ## Run
 
 ```bash
@@ -61,6 +67,14 @@ python3 app.py
 Then open:
 
 - [http://127.0.0.1:7860](http://127.0.0.1:7860)
+
+## Tests
+
+Run the lightweight smoke tests with:
+
+```bash
+pytest
+```
 
 ## Outputs
 
@@ -86,3 +100,7 @@ git push -u origin main
 ```
 
 If you want, the next step can be a stronger research-grade pipeline using segmentation, multi-view geometry, contour extraction, and pre/post-difflation comparison analytics.
+
+## Best Backend For UAV 3D
+
+If the goal is precise UAV reconstruction, the best next backend is not a single-image object demo. A stronger choice is a photogrammetry pipeline such as WebODM / OpenDroneMap using multiple overlapping drone images from the same plot. This project currently supports a single-image 3D approximation for interaction, but research-grade geometry should come from multi-view reconstruction.
